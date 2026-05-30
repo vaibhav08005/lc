@@ -7,7 +7,7 @@ YAML input
   -> input loader
   -> normalizer
   -> canonical mortgage case
-  -> versioned Halifax rules
+  -> versioned lender rules
   -> rule results
   -> overall decision report
 ```
@@ -79,6 +79,7 @@ Supported rule packs:
 
 - `halifax_2026_05`
 - `barclays_2026_05`
+- `natwest_2026_05`
 
 The CLI selects the rule pack with `--lender`. Halifax remains the default for backward compatibility.
 
@@ -95,6 +96,8 @@ The Barclays implementation is split by concern:
 
 `barclays_2026_05` is the orchestrator that combines these grouped rules with the structured Barclays catalogue.
 
+The NatWest implementation follows the same grouped-rule pattern for applicant, lending, income, credit, property, schemes, and documentation checks. `natwest_2026_05` combines those rules with the structured NatWest A-Z and linked-hub catalogue.
+
 ## Snapshot Catalogue Design
 
 Lender source pages contain many criteria statements that cannot all become deterministic code immediately. Instead of ignoring them, the project stores dated HTML snapshots and parses visible text into catalogue entries.
@@ -104,6 +107,12 @@ Barclays has a dedicated extractor in `barclays_catalogue.py`. It parses the res
 `data/catalogues/barclays_residential_criteria_2026-05-31.json`
 
 The catalogue currently represents all 60 visible Barclays residential A-Z sections and 848 source-backed criteria statements.
+
+NatWest has a dedicated extractor in `natwest_catalogue.py`. It parses the A-Z criteria page and dated same-domain linked criteria/hub snapshots, then writes:
+
+`data/catalogues/natwest_lending_criteria_2026-05-31.json`
+
+The NatWest catalogue currently represents 118 visible A-Z sections, 28 linked NatWest source pages, and 2,354 source-backed criteria statements.
 
 Catalogue entries:
 

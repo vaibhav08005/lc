@@ -33,7 +33,7 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command")
     evaluate = subparsers.add_parser("evaluate", help="Evaluate a YAML case file.")
     evaluate.add_argument("path", nargs="?", default="input.yaml", help="Path to YAML input. Defaults to input.yaml.")
-    evaluate.add_argument("--lender", choices=["halifax", "barclays"], default="halifax", help="Lender rule pack to use. Defaults to halifax.")
+    evaluate.add_argument("--lender", choices=["halifax", "barclays", "natwest"], default="halifax", help="Lender rule pack to use. Defaults to halifax.")
     evaluate.add_argument("--text", action="store_true", help="Print a human-readable report instead of JSON.")
     evaluate.add_argument("--no-snapshot", action="store_true", help="Run only automated rules, without snapshot catalogue entries.")
     evaluate.add_argument("--show-all-rules", action="store_true", help="Include every rule result in JSON output for debugging.")

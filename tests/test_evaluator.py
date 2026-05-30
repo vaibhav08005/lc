@@ -5,9 +5,12 @@ from pathlib import Path
 from halifax_criteria.evaluator import evaluate_file, overall_result
 from halifax_criteria.models import AutomationLevel, RuleResult, RuleStatus
 from halifax_criteria.normalizer import normalize
-from halifax_criteria.rules import barclays_2026_05
+from halifax_criteria.rules import barclays_2026_05, natwest_2026_05
 from halifax_criteria.rules.barclays_catalogue import build_catalogue, extract_sections, section_titles
 from halifax_criteria.rules.halifax_2026_05 import evaluate_rules
+from halifax_criteria.rules.natwest_catalogue import build_catalogue as build_natwest_catalogue
+from halifax_criteria.rules.natwest_catalogue import extract_linked_sections as extract_natwest_linked_sections
+from halifax_criteria.rules.natwest_catalogue import extract_main_sections as extract_natwest_main_sections
 from halifax_criteria.rules.snapshot_catalogue import extract_snapshot_items
 
 
@@ -15,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SAMPLE = ROOT / "input.yaml"
 SNAPSHOT = ROOT / "data" / "sources" / "halifax_intermediaries_criteria_2026-05-30.html"
 BARCLAYS_SNAPSHOT = ROOT / "data" / "sources" / "barclays_intermediaries_residential_criteria_2026-05-31.html"
+NATWEST_SNAPSHOT = ROOT / "data" / "sources" / "natwest_intermediary_lending_criteria_2026-05-31.html"
 
 
 def sample_case():
@@ -293,3 +297,152 @@ def test_barclays_affordability_is_marked_proprietary():
     rule = next(result for result in results if result.rule_id == "barclays.affordability.proprietary")
     assert rule.status == RuleStatus.REFER
     assert rule.automation_level == AutomationLevel.OUT_OF_SCOPE_PROPRIETARY
+
+
+def test_natwest_sample_case_runs_with_expected_result_shape():
+    report = evaluate_file(SAMPLE, lender="natwest")
+    assert report["lender"] == "NatWest"
+    assert report["criteria_version"] == "2026-05-31"
+    assert report["source_url"] == "https://www.intermediary.natwest.com/lending-criteria.html"
+    assert report["derived"]["loan_amount"] == 200000
+    assert report["derived"]["ltv_percent"] == 66.67
+    assert "natwest_selected_ltv_cap" in report["derived"]
+    assert report["overall_result"] in {"INSUFFICIENT_DATA", "REFER", "FAIL"}
+    assert report["rule_summary"]["total"] > 1000
+
+
+def test_natwest_catalogue_extracts_main_and_linked_sources():
+    main_sections = extract_natwest_main_sections(NATWEST_SNAPSHOT)
+    linked_sections = extract_natwest_linked_sections(ROOT / "data" / "sources")
+    assert len(main_sections) == 118
+    assert all(main_sections[section] for section in main_sections)
+    assert linked_sections
+    assert any("Affordability" in section for section in linked_sections)
+    assert any("Property" in section or "Valuation" in section for section in linked_sections)
+
+
+def test_natwest_catalogue_has_required_audit_fields():
+    catalogue = build_natwest_catalogue(NATWEST_SNAPSHOT, ROOT / "data" / "sources")
+    assert len(catalogue) > 2000
+    assert len({item["rule_id"] for item in catalogue}) == len(catalogue)
+    assert len({item["source_url"] for item in catalogue}) > 10
+    for item in catalogue[:200]:
+        assert item["lender"] == "NatWest"
+        assert item["criteria_version"] == "2026-05-31"
+        assert item["section"]
+        assert item["source_url"].startswith("https://www.intermediary.natwest.com/")
+        assert item["source_ref"]
+        assert item["source_text"]
+        assert item["criteria_type"] in {"hard_rule", "soft_rule", "evidence_rule", "manual_rule", "proprietary_rule"}
+        assert item["automation_level"] in {"AUTOMATED", "MANUAL_REFER", "INSUFFICIENT_DATA", "OUT_OF_SCOPE_PROPRIETARY"}
+        assert isinstance(item["required_fields"], list)
+
+
+def test_natwest_show_all_rules_includes_catalogue_source_text():
+    report = evaluate_file(SAMPLE, lender="natwest", include_all_rules=True)
+    catalogue_rules = [rule for rule in report["rule_results"] if rule["rule_id"].startswith("natwest.catalogue.")]
+    assert catalogue_rules
+    assert all(rule["section"] for rule in catalogue_rules[:20])
+    assert all(rule["source_text"] for rule in catalogue_rules[:20])
+
+
+def test_natwest_applicant_count_above_two_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_no_of_applicants"] = 3
+    results = natwest_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "natwest.applicants.count").status == RuleStatus.FAIL
+
+
+def test_natwest_applicant_under_18_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_appl1_date_of_birth"] = "2010-01-01"
+    raw["var_appl2_date_of_birth"] = "1990-01-01"
+    results = natwest_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "natwest.age.minimum").status == RuleStatus.FAIL
+
+
+def test_natwest_capital_repayment_age_over_75_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_appl1_date_of_birth"] = "1955-01-01"
+    raw["var_appl2_date_of_birth"] = "1990-01-01"
+    raw["var_repayment_type"] = "principal_over_mortgage_term"
+    results = natwest_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "natwest.age.maximum_at_term_end").status == RuleStatus.FAIL
+
+
+def test_natwest_interest_only_age_over_70_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_appl1_date_of_birth"] = "1960-01-01"
+    raw["var_appl2_date_of_birth"] = "1990-01-01"
+    raw["var_repayment_type"] = "interest_only"
+    raw["var_interest_only_amount"] = 200000
+    results = natwest_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "natwest.age.maximum_at_term_end").status == RuleStatus.FAIL
+
+
+def test_natwest_adverse_credit_declaration_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_adverse_credit_declared"] = "yes"
+    results = natwest_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "natwest.credit.adverse_history").status == RuleStatus.FAIL
+
+
+def test_natwest_agricultural_restriction_above_50_ltv_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_property_details_special_condition"] = "agricultural restriction"
+    raw["var_property_details_property_type"] = "house"
+    raw["var_property_details_description"] = "detached house"
+    raw["var_property_details_tenure"] = "freehold"
+    results = natwest_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "natwest.property.agricultural_restriction").status == RuleStatus.FAIL
+
+
+def test_natwest_background_btl_shortfall_refers():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_other_properties"] = [{"is_rental_property": "yes", "monthly_repayment": 900, "monthly_rent": 700}]
+    results = natwest_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    rule = next(result for result in results if result.rule_id == "natwest.background_btl")
+    assert rule.status == RuleStatus.REFER
+    assert rule.data["shortfalls"][0]["monthly_shortfall"] == 200
+
+
+def test_natwest_additional_borrowing_business_purpose_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_equity_release_amount"] = 10000
+    raw["var_add_borrow_details"] = "business purpose"
+    results = natwest_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "natwest.additional_borrowing").status == RuleStatus.FAIL
+
+
+def test_natwest_consent_to_let_unsecured_debt_consolidation_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_equity_release_amount"] = 10000
+    raw["var_add_borrow_details"] = "consent to let unsecured debt consolidation"
+    results = natwest_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "natwest.additional_borrowing").status == RuleStatus.FAIL
+
+
+def test_natwest_missing_key_fields_are_insufficient():
+    results = natwest_2026_05.evaluate_rules(sample_case(), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "natwest.age.minimum").status == RuleStatus.INSUFFICIENT_DATA
+    assert next(result for result in results if result.rule_id == "natwest.property.details").status == RuleStatus.INSUFFICIENT_DATA
+    assert next(result for result in results if result.rule_id == "natwest.credit.adverse_history").status == RuleStatus.INSUFFICIENT_DATA
+
+
+def test_natwest_proprietary_rules_are_marked():
+    results = natwest_2026_05.evaluate_rules(sample_case(), include_snapshot=False)
+    affordability = next(result for result in results if result.rule_id == "natwest.affordability.proprietary")
+    credit = next(result for result in results if result.rule_id == "natwest.credit.scoring")
+    valuation = next(result for result in results if result.rule_id == "natwest.property.valuation")
+    assert affordability.automation_level == AutomationLevel.OUT_OF_SCOPE_PROPRIETARY
+    assert credit.automation_level == AutomationLevel.OUT_OF_SCOPE_PROPRIETARY
+    assert valuation.automation_level == AutomationLevel.OUT_OF_SCOPE_PROPRIETARY

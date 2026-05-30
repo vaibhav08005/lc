@@ -30,7 +30,17 @@ def _rule_pack(lender: str):
             "evaluate_rules": pack.evaluate_rules,
             "extra_derived": pack.extra_derived,
         }
-    raise ValueError(f"Unsupported lender '{lender}'. Supported lenders: halifax, barclays")
+    if normalized == "natwest":
+        from .rules import natwest_2026_05 as pack
+
+        return {
+            "lender": "NatWest",
+            "criteria_version": pack.CRITERIA_VERSION,
+            "source_url": pack.SOURCE_URL,
+            "evaluate_rules": pack.evaluate_rules,
+            "extra_derived": pack.extra_derived,
+        }
+    raise ValueError(f"Unsupported lender '{lender}'. Supported lenders: halifax, barclays, natwest")
 
 
 def overall_result(results: list[RuleResult]) -> RuleStatus:

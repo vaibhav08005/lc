@@ -63,6 +63,15 @@ Additional Barclays rule groups now cover:
 - ID/address, supporting documentation, internet bank statements and offer validity
 - porting, permission to let, short-term letting and second/subsequent charges
 
+Current NatWest automated rule groups cover:
+
+- applicant count, minimum age, age at term end, and foreign-national residency screens
+- loan amount, term, LTV caps, loan-to-income referral, interest-only, additional borrowing and debt consolidation
+- affordability calculator, income packaging, employment, variable income, and unacceptable income treatment
+- adverse credit declarations, credit scoring, financial commitments, and background BTL shortfalls
+- deposit source, property facts, agricultural restriction LTV, cladding, and valuation
+- shared/special schemes, porting/product transfer, second residential property, and core documentation checks
+
 ## Snapshot Catalogue
 
 Snapshot catalogue entries are generated from:
@@ -77,9 +86,19 @@ Barclays structured catalogue:
 
 `data/catalogues/barclays_residential_criteria_2026-05-31.json`
 
+NatWest main snapshot:
+
+`data/sources/natwest_intermediary_lending_criteria_2026-05-31.html`
+
+NatWest structured catalogue:
+
+`data/catalogues/natwest_lending_criteria_2026-05-31.json`
+
 The Barclays catalogue captures all 60 visible A-Z sections and stores one auditable entry per extracted paragraph, list item, or table row. Each entry includes source text, section name, criteria type, automation level, required fields, and implemented rule reference where one exists.
 
-The parsers read visible headings, paragraphs, list items, and table cells. Halifax snapshot entries remain manual-review catalogue items. Barclays entries are classified as automated, manual, insufficient-data, or proprietary based on their source text and linked implemented rule coverage.
+The NatWest catalogue captures all 118 visible A-Z sections plus linked same-domain criteria/hub snapshots. It currently stores 2,354 auditable source-backed entries across 29 NatWest source URLs.
+
+The parsers read visible headings, paragraphs, list items, and table cells. Halifax snapshot entries remain manual-review catalogue items. Barclays and NatWest entries are classified as automated, manual, insufficient-data, or proprietary based on source text and linked implemented rule coverage.
 
 This is why full runs can show hundreds or thousands of catalogue rules. The design is conservative: it is better to surface a visible criteria item for review than to silently ignore it.
 
@@ -101,6 +120,18 @@ Show all Barclays automated and catalogue rules:
 
 ```powershell
 uv run python -m halifax_criteria evaluate input.yaml --lender barclays --show-all-rules
+```
+
+Explicit NatWest run:
+
+```powershell
+uv run python -m halifax_criteria evaluate input.yaml --lender natwest
+```
+
+Show all NatWest automated and catalogue rules:
+
+```powershell
+uv run python -m halifax_criteria evaluate input.yaml --lender natwest --show-all-rules
 ```
 
 Automated-only mode:
@@ -132,7 +163,7 @@ Rule functions should:
 When the source criteria changes:
 
 1. Save a new dated HTML snapshot under `data/sources/`.
-2. Add a new versioned rules file, for example `halifax_2026_06.py` or `barclays_2026_06.py`.
+2. Add a new versioned rules file, for example `halifax_2026_06.py`, `barclays_2026_06.py`, or `natwest_2026_06.py`.
 3. Update `CRITERIA_VERSION`.
 4. Keep the old snapshot and old rules file for historical explainability.
 5. Add tests that show any changed behavior.

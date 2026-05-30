@@ -26,6 +26,12 @@ Run Barclays:
 uv run python -m halifax_criteria evaluate input.yaml --lender barclays
 ```
 
+Run NatWest:
+
+```powershell
+uv run python -m halifax_criteria evaluate input.yaml --lender natwest
+```
+
 Run tests:
 
 ```powershell
@@ -78,6 +84,8 @@ Current coverage includes:
 - all 60 Barclays A-Z catalogue sections
 - Barclays catalogue audit fields and source text
 - additional borrowing, debt consolidation, special scheme and proprietary affordability scenarios
+- all 118 NatWest A-Z catalogue sections and linked NatWest source pages
+- NatWest applicant count, age, adverse credit, agricultural restriction, additional borrowing, BTL shortfall, and proprietary/manual checks
 - credit-card 5% balance treatment
 - BTL shortfall referral
 - worst-rule-wins result ordering
@@ -114,6 +122,24 @@ uv run python -m halifax_criteria.rules.barclays_catalogue
 The generated output is:
 
 `data/catalogues/barclays_residential_criteria_2026-05-31.json`
+
+After regeneration, run:
+
+```powershell
+uv run pytest
+```
+
+## Regenerating NatWest Catalogue
+
+The NatWest catalogue is generated from the saved main A-Z snapshot and linked NatWest source snapshots:
+
+```powershell
+uv run python -m halifax_criteria.rules.natwest_catalogue
+```
+
+The generated output is:
+
+`data/catalogues/natwest_lending_criteria_2026-05-31.json`
 
 After regeneration, run:
 

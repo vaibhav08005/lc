@@ -1,6 +1,6 @@
 # Mortgage Criteria Evaluator
 
-An indicative UK mortgage lending criteria evaluator for broker-style YAML case inputs. It currently supports Halifax and Barclays residential criteria packs.
+An indicative UK mortgage lending criteria evaluator for broker-style YAML case inputs. It currently supports Halifax, Barclays, and NatWest residential criteria packs.
 
 The tool reads a YAML application, normalizes the `var_...` fields into a mortgage case, runs versioned lender criteria checks, and returns a structured decision report. It is designed for pre-screening and case triage, not for guaranteeing a lender mortgage approval.
 
@@ -14,11 +14,15 @@ Primary source snapshots:
 
 `data/sources/barclays_intermediaries_residential_criteria_2026-05-31.html`
 
+`data/sources/natwest_intermediary_lending_criteria_2026-05-31.html`
+
 Source URLs:
 
 https://www.halifax-intermediaries.co.uk/criteria.html
 
 https://intermediaries.uk.barclays/home/lending-criteria/residential/
+
+https://www.intermediary.natwest.com/lending-criteria.html
 
 ## What It Does
 
@@ -28,6 +32,7 @@ https://intermediaries.uk.barclays/home/lending-criteria/residential/
 - Runs deterministic lender pre-screen rules where published criteria and input data are available.
 - Represents visible lender criteria snapshots as auditable catalogue entries so criteria topics are not silently dropped.
 - Builds a structured Barclays residential A-Z catalogue from accordion sections, paragraphs, list items, and table rows.
+- Builds a structured NatWest A-Z and linked-hub catalogue from visible headings, paragraphs, list items, and table rows.
 - Produces JSON by default, with an optional readable terminal table.
 
 ## Result Model
@@ -43,7 +48,7 @@ Rule statuses:
 
 - `PASS`: the supplied case passes that rule.
 - `FAIL`: the supplied case breaches a hard rule.
-- `REFER`: the case may be acceptable but needs broker/manual/Halifax review.
+- `REFER`: the case may be acceptable but needs broker/manual/lender review.
 - `INSUFFICIENT_DATA`: required facts are missing from the input.
 
 Automation levels:
@@ -51,7 +56,7 @@ Automation levels:
 - `AUTOMATED`: deterministic rule implemented in code.
 - `MANUAL_REFER`: criteria exists but needs human review.
 - `INSUFFICIENT_DATA`: criteria cannot be evaluated because input fields are missing.
-- `OUT_OF_SCOPE_PROPRIETARY`: criteria depends on unavailable Halifax systems or judgement.
+- `OUT_OF_SCOPE_PROPRIETARY`: criteria depends on unavailable lender systems or judgement.
 
 ## Setup
 
@@ -91,6 +96,7 @@ Evaluate with an explicit lender:
 ```powershell
 uv run python -m halifax_criteria evaluate input.yaml --lender halifax
 uv run python -m halifax_criteria evaluate input.yaml --lender barclays
+uv run python -m halifax_criteria evaluate input.yaml --lender natwest
 ```
 
 Evaluate a different YAML case:
@@ -123,13 +129,17 @@ For Barclays, full output includes both automated rules and the structured A-Z c
 
 `data/catalogues/barclays_residential_criteria_2026-05-31.json`
 
+For NatWest, full output includes automated rules and the structured A-Z plus linked-hub catalogue stored at:
+
+`data/catalogues/natwest_lending_criteria_2026-05-31.json`
+
 ## Example Output Shape
 
 ```json
 {
-  "lender": "Barclays",
+  "lender": "NatWest",
   "criteria_version": "2026-05-31",
-  "source_url": "https://intermediaries.uk.barclays/home/lending-criteria/residential/",
+  "source_url": "https://www.intermediary.natwest.com/lending-criteria.html",
   "overall_result": "INSUFFICIENT_DATA",
   "derived": {
     "loan_amount": 200000.0,
@@ -138,15 +148,15 @@ For Barclays, full output includes both automated rules and the structured A-Z c
     "lti_multiple": 1.38,
     "mortgage_term_months": 240,
     "applicant_count": 2,
-    "barclays_selected_ltv_cap": 90.0,
-    "barclays_ltv_cap_reason": "customer retaining more than one mortgaged residential property cap"
+    "natwest_selected_ltv_cap": 75.0,
+    "natwest_ltv_cap_reason": "foreign national without permanent right to reside cap"
   },
   "rule_summary": {
-    "total": 880,
-    "pass": 17,
+    "total": 2386,
+    "pass": 13,
     "fail": 0,
-    "refer": 727,
-    "insufficient_data": 136
+    "refer": 2022,
+    "insufficient_data": 351
   },
   "missing_fields": [
     "var_appl1_date_of_birth",
@@ -164,7 +174,7 @@ Run the full test suite:
 uv run pytest
 ```
 
-The tests cover sample-case derivations, hard-rule failures, missing-data behavior, BTL shortfall logic, credit-card commitment treatment, and snapshot catalogue integrity.
+The tests cover sample-case derivations, hard-rule failures, missing-data behavior, BTL shortfall logic, credit-card commitment treatment, and lender catalogue integrity.
 
 ## Project Documentation
 
@@ -179,9 +189,11 @@ The tests cover sample-case derivations, hard-rule failures, missing-data behavi
 .
 |-- data/sources/
 |   |-- halifax_intermediaries_criteria_2026-05-30.html
-|   `-- barclays_intermediaries_residential_criteria_2026-05-31.html
+|   |-- barclays_intermediaries_residential_criteria_2026-05-31.html
+|   `-- natwest_intermediary_lending_criteria_2026-05-31.html
 |-- data/catalogues/
-|   `-- barclays_residential_criteria_2026-05-31.json
+|   |-- barclays_residential_criteria_2026-05-31.json
+|   `-- natwest_lending_criteria_2026-05-31.json
 |-- docs/
 |-- src/halifax_criteria/
 |   |-- cli.py
@@ -193,6 +205,8 @@ The tests cover sample-case derivations, hard-rule failures, missing-data behavi
 |       |-- barclays_2026_05.py
 |       |-- barclays_catalogue.py
 |       |-- halifax_2026_05.py
+|       |-- natwest_2026_05.py
+|       |-- natwest_catalogue.py
 |       `-- snapshot_catalogue.py
 |-- test-cases/
 |-- tests/
