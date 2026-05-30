@@ -6,6 +6,7 @@ from halifax_criteria.evaluator import evaluate_file, overall_result
 from halifax_criteria.models import AutomationLevel, RuleResult, RuleStatus
 from halifax_criteria.normalizer import normalize
 from halifax_criteria.rules import barclays_2026_05
+from halifax_criteria.rules.barclays_catalogue import build_catalogue, extract_sections, section_titles
 from halifax_criteria.rules.halifax_2026_05 import evaluate_rules
 from halifax_criteria.rules.snapshot_catalogue import extract_snapshot_items
 
@@ -139,6 +140,8 @@ def test_barclays_sample_case_runs_with_expected_result_shape():
     assert report["criteria_version"] == "2026-05-31"
     assert report["derived"]["loan_amount"] == 200000
     assert report["derived"]["ltv_percent"] == 66.67
+    assert report["derived"]["barclays_selected_ltv_cap"] == 90.0
+    assert report["derived"]["barclays_retained_property_count"] == 2
     assert report["overall_result"] in {"INSUFFICIENT_DATA", "REFER"}
     assert report["rule_summary"]["total"] > 100
 
@@ -192,10 +195,101 @@ def test_barclays_new_build_incentive_above_5_percent_refers():
 
 
 def test_barclays_snapshot_catalogue_integrity():
-    items = extract_snapshot_items(
-        BARCLAYS_SNAPSHOT,
-        id_prefix="barclays.snapshot",
-        start_markers=("residential lending criteria", "what are our lending criteria?"),
-    )
-    assert len(items) > 100
-    assert len({item.rule_id for item in items}) == len(items)
+    html = BARCLAYS_SNAPSHOT.read_text(encoding="utf-8", errors="ignore")
+    titles = section_titles(html)
+    sections = extract_sections(BARCLAYS_SNAPSHOT)
+    assert len(titles) == 60
+    assert set(titles) == set(sections)
+    assert all(sections[title] for title in titles)
+
+
+def test_barclays_catalogue_has_required_audit_fields():
+    catalogue = build_catalogue(BARCLAYS_SNAPSHOT)
+    assert len(catalogue) > 800
+    rule_ids = {item["rule_id"] for item in catalogue}
+    assert len(rule_ids) == len(catalogue)
+    for item in catalogue:
+        assert item["lender"] == "Barclays"
+        assert item["criteria_version"] == "2026-05-31"
+        assert item["section"]
+        assert item["source_url"].startswith("https://intermediaries.uk.barclays/")
+        assert item["source_ref"]
+        assert item["source_text"]
+        assert item["criteria_type"] in {"hard_rule", "soft_rule", "evidence_rule", "manual_rule", "proprietary_rule"}
+        assert item["automation_level"] in {"AUTOMATED", "MANUAL_REFER", "INSUFFICIENT_DATA", "OUT_OF_SCOPE_PROPRIETARY"}
+        assert isinstance(item["required_fields"], list)
+
+
+def test_barclays_show_all_rules_includes_catalogue_source_text():
+    report = evaluate_file(SAMPLE, lender="barclays", include_all_rules=True)
+    assert "rule_results" in report
+    catalogue_rules = [rule for rule in report["rule_results"] if rule["rule_id"].startswith("barclays.catalogue.")]
+    assert catalogue_rules
+    assert all(rule["section"] for rule in catalogue_rules[:20])
+    assert all(rule["source_text"] for rule in catalogue_rules[:20])
+
+
+def test_barclays_purchase_standard_ltv_passes_ltv_rule():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_other_properties"] = []
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.ltv.residential_limits").status == RuleStatus.PASS
+
+
+def test_barclays_additional_borrowing_over_85_ltv_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_property_value"] = 300000
+    raw["var_deposit"] = 30000
+    raw["var_equity_release_amount"] = 10000
+    raw["var_other_properties"] = []
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.additional_borrowing").status == RuleStatus.FAIL
+
+
+def test_barclays_debt_consolidation_over_80_ltv_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_property_value"] = 300000
+    raw["var_deposit"] = 45000
+    raw["var_mortgage_type"] = "remortgage"
+    raw["var_add_borrow_details"] = "debt consolidation"
+    raw["var_other_properties"] = []
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.ltv.residential_limits").status == RuleStatus.FAIL
+
+
+def test_barclays_applicant_over_max_age_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_appl1_date_of_birth"] = "1950-01-01"
+    raw["var_appl2_date_of_birth"] = "1980-01-01"
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.age.maximum_at_term_end").status == RuleStatus.FAIL
+
+
+def test_barclays_unsecured_debt_equal_to_income_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_appl1_credit_commitments"] = [{"type": "cards", "current_balance": 150000, "monthly_payment": 1000}]
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.credit.unsecured_debt_vs_income").status == RuleStatus.FAIL
+
+
+def test_barclays_shared_ownership_cap_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_property_value"] = 300000
+    raw["var_deposit"] = 15000
+    raw["var_mortgage_type"] = "shared ownership purchase"
+    raw["var_other_properties"] = []
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.schemes.classification").status == RuleStatus.FAIL
+
+
+def test_barclays_affordability_is_marked_proprietary():
+    results = barclays_2026_05.evaluate_rules(sample_case(), include_snapshot=False)
+    rule = next(result for result in results if result.rule_id == "barclays.affordability.proprietary")
+    assert rule.status == RuleStatus.REFER
+    assert rule.automation_level == AutomationLevel.OUT_OF_SCOPE_PROPRIETARY

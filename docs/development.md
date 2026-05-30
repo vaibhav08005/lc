@@ -75,6 +75,9 @@ Current coverage includes:
 - new-build flat cap
 - builder incentive cap
 - Barclays minimum income and high-LTV loan-size checks
+- all 60 Barclays A-Z catalogue sections
+- Barclays catalogue audit fields and source text
+- additional borrowing, debt consolidation, special scheme and proprietary affordability scenarios
 - credit-card 5% balance treatment
 - BTL shortfall referral
 - worst-rule-wins result ordering
@@ -99,6 +102,24 @@ The default JSON intentionally omits passing rules to keep output manageable. It
 - `issues`
 
 Use `--show-all-rules` when you need the full `rule_results` list.
+
+## Regenerating Barclays Catalogue
+
+The Barclays catalogue is generated from the saved HTML snapshot:
+
+```powershell
+uv run python -m halifax_criteria.rules.barclays_catalogue
+```
+
+The generated output is:
+
+`data/catalogues/barclays_residential_criteria_2026-05-31.json`
+
+After regeneration, run:
+
+```powershell
+uv run pytest
+```
 
 ## Git Hygiene
 

@@ -116,6 +116,11 @@ class RuleResult:
     source_url: str
     source_ref: str | None = None
     data: dict[str, Any] = field(default_factory=dict)
+    section: str | None = None
+    source_text: str | None = None
+    criteria_type: str | None = None
+    required_fields: list[str] = field(default_factory=list)
+    implemented_by: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -128,4 +133,9 @@ class RuleResult:
             "source_url": self.source_url,
             "source_ref": self.source_ref,
             "data": self.data,
+            "section": self.section,
+            "source_text": self.source_text,
+            "criteria_type": self.criteria_type,
+            "required_fields": self.required_fields,
+            "implemented_by": self.implemented_by,
         }

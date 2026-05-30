@@ -26,7 +26,8 @@ https://intermediaries.uk.barclays/home/lending-criteria/residential/
 - Normalizes applicant, income, mortgage, deposit, property, commitment, and background-property fields.
 - Calculates derived values such as loan amount, LTV, base LTI, core LTI, total LTI, term years, and applicant count.
 - Runs deterministic lender pre-screen rules where published criteria and input data are available.
-- Represents visible lender criteria snapshots as manual catalogue entries so criteria topics are not silently dropped.
+- Represents visible lender criteria snapshots as auditable catalogue entries so criteria topics are not silently dropped.
+- Builds a structured Barclays residential A-Z catalogue from accordion sections, paragraphs, list items, and table rows.
 - Produces JSON by default, with an optional readable terminal table.
 
 ## Result Model
@@ -118,6 +119,10 @@ uv run python -m halifax_criteria evaluate input.yaml --show-all-rules
 
 By default, JSON output includes `issues` only, meaning failed and refer rules. Use `--show-all-rules` when debugging pass rules or catalogue coverage.
 
+For Barclays, full output includes both automated rules and the structured A-Z catalogue stored at:
+
+`data/catalogues/barclays_residential_criteria_2026-05-31.json`
+
 ## Example Output Shape
 
 ```json
@@ -132,14 +137,16 @@ By default, JSON output includes `issues` only, meaning failed and refer rules. 
     "base_lti_multiple": 1.54,
     "lti_multiple": 1.38,
     "mortgage_term_months": 240,
-    "applicant_count": 2
+    "applicant_count": 2,
+    "barclays_selected_ltv_cap": 90.0,
+    "barclays_ltv_cap_reason": "customer retaining more than one mortgaged residential property cap"
   },
   "rule_summary": {
-    "total": 2398,
-    "pass": 10,
+    "total": 880,
+    "pass": 17,
     "fail": 0,
-    "refer": 2384,
-    "insufficient_data": 4
+    "refer": 727,
+    "insufficient_data": 136
   },
   "missing_fields": [
     "var_appl1_date_of_birth",
@@ -173,6 +180,8 @@ The tests cover sample-case derivations, hard-rule failures, missing-data behavi
 |-- data/sources/
 |   |-- halifax_intermediaries_criteria_2026-05-30.html
 |   `-- barclays_intermediaries_residential_criteria_2026-05-31.html
+|-- data/catalogues/
+|   `-- barclays_residential_criteria_2026-05-31.json
 |-- docs/
 |-- src/halifax_criteria/
 |   |-- cli.py
@@ -181,6 +190,8 @@ The tests cover sample-case derivations, hard-rule failures, missing-data behavi
 |   |-- models.py
 |   |-- normalizer.py
 |   `-- rules/
+|       |-- barclays_2026_05.py
+|       |-- barclays_catalogue.py
 |       |-- halifax_2026_05.py
 |       `-- snapshot_catalogue.py
 |-- test-cases/

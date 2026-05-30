@@ -18,6 +18,7 @@ def _rule_pack(lender: str):
             "criteria_version": pack.CRITERIA_VERSION,
             "source_url": "https://www.halifax-intermediaries.co.uk/criteria.html",
             "evaluate_rules": pack.evaluate_rules,
+            "extra_derived": lambda case: {},
         }
     if normalized == "barclays":
         from .rules import barclays_2026_05 as pack
@@ -27,6 +28,7 @@ def _rule_pack(lender: str):
             "criteria_version": pack.CRITERIA_VERSION,
             "source_url": pack.SOURCE_URL,
             "evaluate_rules": pack.evaluate_rules,
+            "extra_derived": pack.extra_derived,
         }
     raise ValueError(f"Unsupported lender '{lender}'. Supported lenders: halifax, barclays")
 
@@ -95,7 +97,7 @@ def evaluate_file(
         "criteria_version": pack["criteria_version"],
         "source_url": pack["source_url"],
         "overall_result": overall.value,
-        "derived": derived(case),
+        "derived": {**derived(case), **pack["extra_derived"](case)},
         "rule_summary": {
             "total": len(results),
             "pass": sum(result.status == RuleStatus.PASS for result in results),

@@ -82,16 +82,35 @@ Supported rule packs:
 
 The CLI selects the rule pack with `--lender`. Halifax remains the default for backward compatibility.
 
+The Barclays implementation is split by concern:
+
+- `barclays_applicant`
+- `barclays_lending`
+- `barclays_income`
+- `barclays_credit`
+- `barclays_property`
+- `barclays_schemes`
+- `barclays_documentation`
+- `barclays_portfolio`
+
+`barclays_2026_05` is the orchestrator that combines these grouped rules with the structured Barclays catalogue.
+
 ## Snapshot Catalogue Design
 
 Lender source pages contain many criteria statements that cannot all become deterministic code immediately. Instead of ignoring them, the project stores dated HTML snapshots and parses visible text into catalogue entries.
 
+Barclays has a dedicated extractor in `barclays_catalogue.py`. It parses the residential A-Z accordion titles and content, then writes:
+
+`data/catalogues/barclays_residential_criteria_2026-05-31.json`
+
+The catalogue currently represents all 60 visible Barclays residential A-Z sections and 848 source-backed criteria statements.
+
 Catalogue entries:
 
 - have stable generated `rule_id` values
-- point to the Halifax source URL
-- use `MANUAL_REFER`
-- show as `REFER` results
+- point to the relevant lender source URL
+- carry an automation classification such as `AUTOMATED`, `MANUAL_REFER`, `INSUFFICIENT_DATA`, or `OUT_OF_SCOPE_PROPRIETARY`
+- show conservative review-oriented results unless a deterministic rule evaluates the case directly
 
 This gives broad criteria coverage while keeping automated rules honest.
 
