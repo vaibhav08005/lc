@@ -6,7 +6,29 @@ from typing import Any
 from .input_loader import load_yaml
 from .models import MortgageCase, RuleResult, RuleStatus
 from .normalizer import normalize
-from .rules.halifax_2026_05 import CRITERIA_VERSION, evaluate_rules
+
+
+def _rule_pack(lender: str):
+    normalized = lender.strip().lower()
+    if normalized == "halifax":
+        from .rules import halifax_2026_05 as pack
+
+        return {
+            "lender": "Halifax",
+            "criteria_version": pack.CRITERIA_VERSION,
+            "source_url": "https://www.halifax-intermediaries.co.uk/criteria.html",
+            "evaluate_rules": pack.evaluate_rules,
+        }
+    if normalized == "barclays":
+        from .rules import barclays_2026_05 as pack
+
+        return {
+            "lender": "Barclays",
+            "criteria_version": pack.CRITERIA_VERSION,
+            "source_url": pack.SOURCE_URL,
+            "evaluate_rules": pack.evaluate_rules,
+        }
+    raise ValueError(f"Unsupported lender '{lender}'. Supported lenders: halifax, barclays")
 
 
 def overall_result(results: list[RuleResult]) -> RuleStatus:
@@ -57,15 +79,21 @@ def _issue_results(results: list[RuleResult]) -> list[dict[str, Any]]:
     ]
 
 
-def evaluate_file(path: str | Path, include_snapshot: bool = True, include_all_rules: bool = False) -> dict[str, Any]:
+def evaluate_file(
+    path: str | Path,
+    include_snapshot: bool = True,
+    include_all_rules: bool = False,
+    lender: str = "halifax",
+) -> dict[str, Any]:
     raw = load_yaml(path)
     case = normalize(raw)
-    results = evaluate_rules(case, include_snapshot=include_snapshot)
+    pack = _rule_pack(lender)
+    results = pack["evaluate_rules"](case, include_snapshot=include_snapshot)
     overall = overall_result(results)
     report = {
-        "lender": "Halifax",
-        "criteria_version": CRITERIA_VERSION,
-        "source_url": "https://www.halifax-intermediaries.co.uk/criteria.html",
+        "lender": pack["lender"],
+        "criteria_version": pack["criteria_version"],
+        "source_url": pack["source_url"],
         "overall_result": overall.value,
         "derived": derived(case),
         "rule_summary": {

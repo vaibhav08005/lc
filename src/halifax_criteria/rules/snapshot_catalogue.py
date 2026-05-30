@@ -65,16 +65,21 @@ def _slug(text: str, max_len: int = 52) -> str:
     return slug[:max_len].strip("_") or "criteria_item"
 
 
-def extract_snapshot_items(snapshot_path: Path) -> list[SnapshotItem]:
+def extract_snapshot_items(
+    snapshot_path: Path,
+    *,
+    id_prefix: str = "halifax.snapshot",
+    start_markers: tuple[str, ...] = ("mortgage lending criteria",),
+) -> list[SnapshotItem]:
     html = snapshot_path.read_text(encoding="utf-8", errors="ignore")
     parser = _CriteriaTextParser()
     parser.feed(html)
     items: list[SnapshotItem] = []
     current_category = "general"
-    started = False
+    started = not start_markers
     for tag, text in parser.entries:
         lower = text.lower()
-        if lower == "mortgage lending criteria":
+        if any(marker in lower for marker in start_markers):
             started = True
         if not started:
             continue
@@ -85,7 +90,7 @@ def extract_snapshot_items(snapshot_path: Path) -> list[SnapshotItem]:
         index = len(items) + 1
         items.append(
             SnapshotItem(
-                rule_id=f"halifax.snapshot.{index:04d}.{_slug(text)}",
+                rule_id=f"{id_prefix}.{index:04d}.{_slug(text)}",
                 category=current_category,
                 text=text,
                 source_ref=f"snapshot item {index}",
@@ -94,10 +99,18 @@ def extract_snapshot_items(snapshot_path: Path) -> list[SnapshotItem]:
     return items
 
 
-def snapshot_results(snapshot_path: Path, automated_rule_ids: Iterable[str]) -> list[RuleResult]:
+def snapshot_results(
+    snapshot_path: Path,
+    automated_rule_ids: Iterable[str],
+    *,
+    source_url: str = SOURCE_URL,
+    id_prefix: str = "halifax.snapshot",
+    lender_name: str = "Halifax",
+    start_markers: tuple[str, ...] = ("mortgage lending criteria",),
+) -> list[RuleResult]:
     automated = set(automated_rule_ids)
     results: list[RuleResult] = []
-    for item in extract_snapshot_items(snapshot_path):
+    for item in extract_snapshot_items(snapshot_path, id_prefix=id_prefix, start_markers=start_markers):
         if item.rule_id in automated:
             continue
         results.append(
@@ -107,8 +120,8 @@ def snapshot_results(snapshot_path: Path, automated_rule_ids: Iterable[str]) -> 
                 status=RuleStatus.REFER,
                 automation_level=AutomationLevel.MANUAL_REFER,
                 severity="manual",
-                message=f"Halifax criteria catalogue item requires manual consideration: {item.text}",
-                source_url=SOURCE_URL,
+                message=f"{lender_name} criteria catalogue item requires manual consideration: {item.text}",
+                source_url=source_url,
                 source_ref=item.source_ref,
             )
         )

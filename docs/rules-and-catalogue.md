@@ -2,8 +2,8 @@
 
 The project has two coverage layers:
 
-1. Automated rules for criteria that can be evaluated from public Halifax criteria and available input fields.
-2. Snapshot catalogue entries for visible Halifax criteria text that still requires manual review or future automation.
+1. Automated rules for criteria that can be evaluated from public lender criteria and available input fields.
+2. Snapshot catalogue entries for visible lender criteria text that still requires manual review or future automation.
 
 ## Automated Rules
 
@@ -11,7 +11,7 @@ Automated rules live in:
 
 `src/halifax_criteria/rules/halifax_2026_05.py`
 
-Current automated rule groups:
+Current Halifax automated rule groups:
 
 | Rule ID | Category | Purpose |
 | --- | --- | --- |
@@ -32,11 +32,36 @@ Current automated rule groups:
 | `halifax.background_mortgages` | background_properties | Applies BTL rent shortfall and retained mortgage review logic. |
 | `halifax.credit.adverse_declaration` | credit | Requires adverse-credit declaration fields or refers declared adverse credit. |
 
+Current Barclays automated rule groups:
+
+| Rule ID | Category | Purpose |
+| --- | --- | --- |
+| `barclays.applicants.count` | applicant | Checks applicant count and flags more than 4 applicants. |
+| `barclays.loan.size` | loan | Checks minimum loan size and refers loans above GBP 5m. |
+| `barclays.term.maximum` | term | Checks 5-year minimum, 40-year repayment max, and 25-year interest-only max. |
+| `barclays.age.maximum_at_term_end` | age | Checks age at term end, including interest-only age caps. |
+| `barclays.ltv.residential_limits` | loan_to_value | Applies Barclays residential LTV caps by scenario. |
+| `barclays.ltv.high_ltv_loan_size` | loan_to_value | Fails loans above GBP 570k where LTV is above 90%. |
+| `barclays.income.minimum` | income | Applies public Barclays minimum income thresholds. |
+| `barclays.affordability.proprietary` | affordability | Refers Barclays calculator/disposable-income assessment. |
+| `barclays.residency.non_uk` | residency | Screens nationality and residency status. |
+| `barclays.employment.evidence` | employment | Screens permanent employed cases and refers others. |
+| `barclays.credit.unsecured_debt_vs_income` | credit | Fails where supplied unsecured debt is at least income. |
+| `barclays.credit.adverse_history` | credit | Requires adverse-credit fields or refers declared adverse credit. |
+| `barclays.deposit.source` | deposit | Screens deposit source evidence/manual criteria. |
+| `barclays.new_build.incentives` | property | Applies Barclays new-build incentive referral logic. |
+| `barclays.property.acceptability` | property | Screens property facts and mixed-use LTV cap. |
+| `barclays.background_properties` | background_properties | Refers background property commitments for affordability treatment. |
+
 ## Snapshot Catalogue
 
 Snapshot catalogue entries are generated from:
 
 `data/sources/halifax_intermediaries_criteria_2026-05-30.html`
+
+Barclays snapshot:
+
+`data/sources/barclays_intermediaries_residential_criteria_2026-05-31.html`
 
 The parser reads visible headings, paragraphs, list items, and table cells. Each item becomes a `MANUAL_REFER` rule unless it is replaced by a specific automated rule.
 
@@ -48,6 +73,12 @@ Full criteria coverage:
 
 ```powershell
 uv run python -m halifax_criteria evaluate input.yaml
+```
+
+Explicit Barclays run:
+
+```powershell
+uv run python -m halifax_criteria evaluate input.yaml --lender barclays
 ```
 
 Automated-only mode:
@@ -72,7 +103,7 @@ Rule functions should:
 - return exactly one `RuleResult`
 - avoid mutating the case
 - include source-aware messages
-- be conservative when Halifax criteria depends on internal systems
+- be conservative when lender criteria depends on internal systems
 
 ## Updating Halifax Criteria
 

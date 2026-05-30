@@ -1,28 +1,32 @@
-# Halifax Criteria Evaluator
+# Mortgage Criteria Evaluator
 
-An indicative Halifax mortgage lending criteria evaluator for broker-style YAML case inputs.
+An indicative UK mortgage lending criteria evaluator for broker-style YAML case inputs. It currently supports Halifax and Barclays residential criteria packs.
 
-The tool reads a YAML application, normalizes the `var_...` fields into a mortgage case, runs versioned Halifax criteria checks, and returns a structured decision report. It is designed for pre-screening and case triage, not for guaranteeing a Halifax mortgage approval.
+The tool reads a YAML application, normalizes the `var_...` fields into a mortgage case, runs versioned lender criteria checks, and returns a structured decision report. It is designed for pre-screening and case triage, not for guaranteeing a lender mortgage approval.
 
 ## Important Disclaimer
 
-This project does not reproduce Halifax's final underwriting decision. Halifax's internal credit score, full affordability model, valuation outcome, and underwriter discretion are not public. Where the published criteria cannot be evaluated deterministically, the tool returns `REFER`, `INSUFFICIENT_DATA`, or a manual-review catalogue item.
+This project does not reproduce a lender's final underwriting decision. Internal credit scoring, full affordability models, valuation outcomes, and underwriter discretion are not public. Where published criteria cannot be evaluated deterministically, the tool returns `REFER`, `INSUFFICIENT_DATA`, or a manual-review catalogue item.
 
-Primary source snapshot:
+Primary source snapshots:
 
 `data/sources/halifax_intermediaries_criteria_2026-05-30.html`
 
-Source URL:
+`data/sources/barclays_intermediaries_residential_criteria_2026-05-31.html`
+
+Source URLs:
 
 https://www.halifax-intermediaries.co.uk/criteria.html
+
+https://intermediaries.uk.barclays/home/lending-criteria/residential/
 
 ## What It Does
 
 - Loads broker-style YAML input such as `input.yaml`.
 - Normalizes applicant, income, mortgage, deposit, property, commitment, and background-property fields.
 - Calculates derived values such as loan amount, LTV, base LTI, core LTI, total LTI, term years, and applicant count.
-- Runs deterministic Halifax pre-screen rules where published criteria and input data are available.
-- Represents the visible Halifax criteria snapshot as manual catalogue entries so criteria topics are not silently dropped.
+- Runs deterministic lender pre-screen rules where published criteria and input data are available.
+- Represents visible lender criteria snapshots as manual catalogue entries so criteria topics are not silently dropped.
 - Produces JSON by default, with an optional readable terminal table.
 
 ## Result Model
@@ -81,6 +85,13 @@ Evaluate the default sample file:
 uv run python -m halifax_criteria evaluate input.yaml
 ```
 
+Evaluate with an explicit lender:
+
+```powershell
+uv run python -m halifax_criteria evaluate input.yaml --lender halifax
+uv run python -m halifax_criteria evaluate input.yaml --lender barclays
+```
+
 Evaluate a different YAML case:
 
 ```powershell
@@ -111,9 +122,9 @@ By default, JSON output includes `issues` only, meaning failed and refer rules. 
 
 ```json
 {
-  "lender": "Halifax",
-  "criteria_version": "2026-05-30",
-  "source_url": "https://www.halifax-intermediaries.co.uk/criteria.html",
+  "lender": "Barclays",
+  "criteria_version": "2026-05-31",
+  "source_url": "https://intermediaries.uk.barclays/home/lending-criteria/residential/",
   "overall_result": "INSUFFICIENT_DATA",
   "derived": {
     "loan_amount": 200000.0,
@@ -160,7 +171,8 @@ The tests cover sample-case derivations, hard-rule failures, missing-data behavi
 ```text
 .
 |-- data/sources/
-|   `-- halifax_intermediaries_criteria_2026-05-30.html
+|   |-- halifax_intermediaries_criteria_2026-05-30.html
+|   `-- barclays_intermediaries_residential_criteria_2026-05-31.html
 |-- docs/
 |-- src/halifax_criteria/
 |   |-- cli.py
@@ -180,4 +192,4 @@ The tests cover sample-case derivations, hard-rule failures, missing-data behavi
 
 ## Maintenance Notes
 
-When Halifax criteria changes, create a new dated snapshot and a new versioned rule module rather than editing historical criteria in place. This keeps old decisions explainable and allows future comparisons between criteria versions.
+When lender criteria changes, create a new dated snapshot and a new versioned rule module rather than editing historical criteria in place. This keeps old decisions explainable and allows future comparisons between criteria versions.

@@ -39,13 +39,13 @@ YAML input
      - `RuleStatus`
      - `AutomationLevel`
 
-5. `halifax_criteria.rules.halifax_2026_05`
-   - Holds deterministic rules for the dated Halifax criteria version.
+5. `halifax_criteria.rules.<lender>_<version>`
+   - Holds deterministic rules for the dated lender criteria version.
    - Exposes `evaluate_rules`.
    - Adds snapshot catalogue results when enabled.
 
 6. `halifax_criteria.rules.snapshot_catalogue`
-   - Parses the saved Halifax HTML snapshot.
+   - Parses saved lender HTML snapshots.
    - Converts visible criteria text into manual-review catalogue entries.
    - Ensures visible criteria items are represented even when not automated.
 
@@ -73,9 +73,18 @@ FAIL > INSUFFICIENT_DATA > REFER > PASS
 
 This makes the report conservative. A case with strong headline LTV/LTI may still be `INSUFFICIENT_DATA` if DOB, property, or adverse-credit facts are missing.
 
+## Lender Rule Packs
+
+Supported rule packs:
+
+- `halifax_2026_05`
+- `barclays_2026_05`
+
+The CLI selects the rule pack with `--lender`. Halifax remains the default for backward compatibility.
+
 ## Snapshot Catalogue Design
 
-The Halifax source page contains many criteria statements that cannot all become deterministic code immediately. Instead of ignoring them, the project stores a dated HTML snapshot and parses visible text into catalogue entries.
+Lender source pages contain many criteria statements that cannot all become deterministic code immediately. Instead of ignoring them, the project stores dated HTML snapshots and parses visible text into catalogue entries.
 
 Catalogue entries:
 

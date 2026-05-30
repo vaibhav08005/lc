@@ -20,6 +20,12 @@ Run the package:
 uv run python -m halifax_criteria evaluate input.yaml
 ```
 
+Run Barclays:
+
+```powershell
+uv run python -m halifax_criteria evaluate input.yaml --lender barclays
+```
+
 Run tests:
 
 ```powershell
@@ -61,13 +67,14 @@ Tests live in:
 Current coverage includes:
 
 - sample-case derivations
-- LTV fail scenarios
+- Halifax and Barclays LTV fail scenarios
 - maximum-term fail scenarios
 - missing DOB handling
 - applicant count fail scenarios
 - non-UK residency referral
 - new-build flat cap
 - builder incentive cap
+- Barclays minimum income and high-LTV loan-size checks
 - credit-card 5% balance treatment
 - BTL shortfall referral
 - worst-rule-wins result ordering

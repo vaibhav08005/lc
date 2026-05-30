@@ -5,6 +5,7 @@ from pathlib import Path
 from halifax_criteria.evaluator import evaluate_file, overall_result
 from halifax_criteria.models import AutomationLevel, RuleResult, RuleStatus
 from halifax_criteria.normalizer import normalize
+from halifax_criteria.rules import barclays_2026_05
 from halifax_criteria.rules.halifax_2026_05 import evaluate_rules
 from halifax_criteria.rules.snapshot_catalogue import extract_snapshot_items
 
@@ -12,6 +13,7 @@ from halifax_criteria.rules.snapshot_catalogue import extract_snapshot_items
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLE = ROOT / "input.yaml"
 SNAPSHOT = ROOT / "data" / "sources" / "halifax_intermediaries_criteria_2026-05-30.html"
+BARCLAYS_SNAPSHOT = ROOT / "data" / "sources" / "barclays_intermediaries_residential_criteria_2026-05-31.html"
 
 
 def sample_case():
@@ -129,3 +131,71 @@ def test_snapshot_catalogue_integrity():
     assert len({item.rule_id for item in items}) == len(items)
     assert all(item.category for item in items)
     assert all(item.source_ref for item in items)
+
+
+def test_barclays_sample_case_runs_with_expected_result_shape():
+    report = evaluate_file(SAMPLE, lender="barclays")
+    assert report["lender"] == "Barclays"
+    assert report["criteria_version"] == "2026-05-31"
+    assert report["derived"]["loan_amount"] == 200000
+    assert report["derived"]["ltv_percent"] == 66.67
+    assert report["overall_result"] in {"INSUFFICIENT_DATA", "REFER"}
+    assert report["rule_summary"]["total"] > 100
+
+
+def test_barclays_high_ltv_loan_size_fails_above_570k():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_property_value"] = 650000
+    raw["var_deposit"] = 50000
+    raw["var_other_properties"] = []
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.ltv.high_ltv_loan_size").status == RuleStatus.FAIL
+
+
+def test_barclays_interest_only_over_75_ltv_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_property_value"] = 300000
+    raw["var_deposit"] = 60000
+    raw["var_repayment_type"] = "interest_only"
+    raw["var_interest_only_amount"] = 240000
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.ltv.residential_limits").status == RuleStatus.FAIL
+
+
+def test_barclays_term_under_5_years_fails():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_mortgage_term"] = 48
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.term.maximum").status == RuleStatus.FAIL
+
+
+def test_barclays_minimum_income_fails_when_no_applicant_has_25k():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_appl1_gross_annual_salary"] = 20000
+    raw["var_appl2_gross_annual_salary"] = 20000
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.income.minimum").status == RuleStatus.FAIL
+
+
+def test_barclays_new_build_incentive_above_5_percent_refers():
+    case = sample_case()
+    raw = dict(case.raw)
+    raw["var_property_details_property_type"] = "house"
+    raw["var_property_details_description"] = "new build house"
+    raw["var_deposit_source_details"] = [{"source": "incentive_builder", "amount": 20000}]
+    results = barclays_2026_05.evaluate_rules(normalize(raw), include_snapshot=False)
+    assert next(result for result in results if result.rule_id == "barclays.new_build.incentives").status == RuleStatus.REFER
+
+
+def test_barclays_snapshot_catalogue_integrity():
+    items = extract_snapshot_items(
+        BARCLAYS_SNAPSHOT,
+        id_prefix="barclays.snapshot",
+        start_markers=("residential lending criteria", "what are our lending criteria?"),
+    )
+    assert len(items) > 100
+    assert len({item.rule_id for item in items}) == len(items)

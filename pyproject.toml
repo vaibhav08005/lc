@@ -1,7 +1,7 @@
 [project]
 name = "halifax-criteria"
 version = "0.1.0"
-description = "Indicative Halifax mortgage lending criteria evaluator"
+description = "Indicative UK lender mortgage criteria evaluator"
 readme = "README.md"
 authors = [
     { name = "Vaibhav", email = "sontakkevaibhav74@gmail.com" }
@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 halifax-criteria = "halifax_criteria.cli:main"
+lending-criteria = "halifax_criteria.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.15,<0.12.0"]
